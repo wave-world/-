@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NISA & iDeCo 完全版シミュレータ</title>
+    <title>NISA & iDeCo パーソナルシミュレータ</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 15px; background: #f0f2f5; color: #333; margin: 0; }
@@ -14,12 +14,11 @@
         .input-group { flex: 1; margin-bottom: 10px; }
         label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 12px; }
         input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        .hint { font-size: 10px; color: #777; margin-top: 2px; }
         button { width: 100%; padding: 14px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
         .result-box { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 5px solid #1a73e8; font-size: 14px; }
         .summary-item { display: flex; justify-content: space-between; margin-bottom: 6px; }
         .summary-total { border-top: 2px solid #ddd; padding-top: 8px; font-size: 16px; color: #1a73e8; font-weight: bold; }
-        .chart-container { position: relative; height: 40vh; width: 100%; margin-top: 10px;}
+        .chart-container { position: relative; height: 45vh; width: 100%; margin-top: 10px;}
     </style>
 </head>
 <body>
@@ -32,26 +31,19 @@
             <div class="input-group"><label>終了年齢</label><input type="number" id="endAge" value="65"></div>
         </div>
         <div class="input-row">
-            <div class="input-group">
-                <label>NISA現在の評価額</label><input type="number" id="startNisaValue" value="1000000">
-            </div>
-            <div class="input-group">
-                <label>NISA使用済枠(元本)</label><input type="number" id="usedNisaLimit" value="800000">
-            </div>
+            <div class="input-group"><label>NISA評価額</label><input type="number" id="startNisaValue" value="1000000"></div>
+            <div class="input-group"><label>NISA使用済枠</label><input type="number" id="usedNisaLimit" value="800000"></div>
         </div>
-        <div class="input-group">
-            <label>iDeCo現在の評価額</label><input type="number" id="startIdecoValue" value="500000">
-        </div>
+        <div class="input-group"><label>iDeCo評価額</label><input type="number" id="startIdecoValue" value="500000"></div>
 
         <hr style="border:0; border-top:1px solid #eee;">
-        <h2>これからの積立設定</h2>
+        <h2>積立設定</h2>
         <div class="input-row">
             <div class="input-group"><label>NISA月額</label><input type="number" id="nisaMonthly" value="50000"></div>
             <div class="input-group"><label>iDeCo月額</label><input type="number" id="idecoMonthly" value="23000"></div>
         </div>
-        <div class="input-group"><label>期待利率 (年利%)</label><input type="number" id="rate" value="5" step="0.1"></div>
-        
-        <button onclick="simulate()">シミュレーション実行</button>
+        <div class="input-group"><label>期待利率 (%)</label><input type="number" id="rate" value="5" step="0.1"></div>
+        <button onclick="simulate()">計算 & データを保存</button>
     </div>
 
     <div class="card" id="chartCard" style="display:none;">
@@ -62,57 +54,71 @@
 
 <script>
 let myChart = null;
+
+// --- 起動時に保存データを読み込む ---
+window.onload = function() {
+    const savedData = localStorage.getItem('invSimData');
+    if (savedData) {
+        const data = JSON.parse(savedData);
+        document.getElementById('currentAge').value = data.currentAge;
+        document.getElementById('endAge').value = data.endAge;
+        document.getElementById('startNisaValue').value = data.startNisaValue;
+        document.getElementById('usedNisaLimit').value = data.usedNisaLimit;
+        document.getElementById('startIdecoValue').value = data.startIdecoValue;
+        document.getElementById('nisaMonthly').value = data.nisaMonthly;
+        document.getElementById('idecoMonthly').value = data.idecoMonthly;
+        document.getElementById('rate').value = data.rate;
+        simulate(); // 保存データがあれば即座に計算実行
+    }
+};
+
 function simulate() {
-    const curAge = parseInt(document.getElementById('currentAge').value) || 0;
-    const endAge = parseInt(document.getElementById('endAge').value) || 0;
-    const years = endAge - curAge;
-    
-    let startNisa = parseFloat(document.getElementById('startNisaValue').value) || 0;
-    let usedNisa = parseFloat(document.getElementById('usedNisaLimit').value) || 0;
-    let startIdeco = parseFloat(document.getElementById('startIdecoValue').value) || 0;
-    
-    let nMonthly = parseFloat(document.getElementById('nisaMonthly').value) || 0;
-    const iMonthly = parseFloat(document.getElementById('idecoMonthly').value) || 0;
-    const annualRate = parseFloat(document.getElementById('rate').value) || 0;
+    const inputs = {
+        currentAge: parseInt(document.getElementById('currentAge').value) || 0,
+        endAge: parseInt(document.getElementById('endAge').value) || 0,
+        startNisaValue: parseFloat(document.getElementById('startNisaValue').value) || 0,
+        usedNisaLimit: parseFloat(document.getElementById('usedNisaLimit').value) || 0,
+        startIdecoValue: parseFloat(document.getElementById('startIdecoValue').value) || 0,
+        nisaMonthly: parseFloat(document.getElementById('nisaMonthly').value) || 0,
+        idecoMonthly: parseFloat(document.getElementById('idecoMonthly').value) || 0,
+        rate: parseFloat(document.getElementById('rate').value) || 0
+    };
 
-    if (years <= 0) { alert("年齢設定を確認してください"); return; }
-    if (nMonthly > 100000) nMonthly = 100000;
+    // --- データをLocalStorageに保存 ---
+    localStorage.setItem('invSimData', JSON.stringify(inputs));
 
-    const r = annualRate / 100 / 12;
+    const years = inputs.endAge - inputs.currentAge;
+    if (years <= 0) return;
+    
+    const r = inputs.rate / 100 / 12;
     const NISA_LIMIT = 18000000;
 
     let labels = [];
-    let assetData = [];    // 評価額の推移
-    let principalData = []; // 元本の推移
+    let assetData = [];
+    let principalData = [];
     
-    let nisaTotal = startNisa;
-    let nisaPrincipal = usedNisa;
-    let idecoTotal = startIdeco;
-    let idecoPrincipal = startIdeco; // iDeCoは簡略化のため現在額を元本として加算
+    let nisaTotal = inputs.startNisaValue;
+    let nisaPrincipal = inputs.usedNisaLimit;
+    let idecoTotal = inputs.startIdecoValue;
+    let idecoPrincipal = inputs.startIdecoValue;
 
-    labels.push(`${curAge}歳`);
+    labels.push(`${inputs.currentAge}歳`);
     assetData.push(Math.round(nisaTotal + idecoTotal));
     principalData.push(Math.round(nisaPrincipal + idecoPrincipal));
 
     for (let y = 1; y <= years; y++) {
         for (let m = 1; m <= 12; m++) {
-            // NISA
-            if (nisaPrincipal + nMonthly <= NISA_LIMIT) {
-                nisaTotal += nMonthly;
-                nisaPrincipal += nMonthly;
+            if (nisaPrincipal + inputs.nisaMonthly <= NISA_LIMIT) {
+                nisaTotal += inputs.nisaMonthly; nisaPrincipal += inputs.nisaMonthly;
             } else if (nisaPrincipal < NISA_LIMIT) {
                 const rem = NISA_LIMIT - nisaPrincipal;
-                nisaTotal += rem;
-                nisaPrincipal += rem;
+                nisaTotal += rem; nisaPrincipal += rem;
             }
             nisaTotal *= (1 + r);
-
-            // iDeCo
-            idecoTotal += iMonthly;
-            idecoPrincipal += iMonthly;
+            idecoTotal += inputs.idecoMonthly; idecoPrincipal += inputs.idecoMonthly;
             idecoTotal *= (1 + r);
         }
-        labels.push(`${curAge + y}歳`);
+        labels.push(`${inputs.currentAge + y}歳`);
         assetData.push(Math.round(nisaTotal + idecoTotal));
         principalData.push(Math.round(nisaPrincipal + idecoPrincipal));
     }
@@ -130,33 +136,16 @@ function simulate() {
     const ctx = document.getElementById('myChart').getContext('2d');
     if (myChart) myChart.destroy();
     myChart = new Chart(ctx, {
-        type: 'line',
         data: {
             labels: labels,
             datasets: [
-                { 
-                    label: '評価金額合計', 
-                    data: assetData, 
-                    borderColor: '#1a73e8', 
-                    backgroundColor: 'rgba(26,115,232,0.1)', 
-                    fill: true,
-                    tension: 0.3 
-                },
-                { 
-                    label: '掛金合計(元本)', 
-                    data: principalData, 
-                    borderColor: '#5f6368', 
-                    borderDash: [5, 5], // 点線にする
-                    backgroundColor: 'transparent',
-                    fill: false,
-                    tension: 0
-                }
+                { type: 'line', label: '評価金額', data: assetData, borderColor: '#1a73e8', backgroundColor: 'rgba(26,115,232,0.1)', fill: false, tension: 0.3 },
+                { type: 'bar', label: '掛金(元本)', data: principalData, backgroundColor: 'rgba(95, 99, 104, 0.4)', borderColor: '#5f6368', borderWidth: 1 }
             ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            scales: { y: { ticks: { callback: v => (v / 10000) + '万' } } }
+            scales: { y: { beginAtZero: true, ticks: { callback: v => (v / 10000) + '万' } } }
         }
     });
 }
