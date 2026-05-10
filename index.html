@@ -23,7 +23,8 @@
         label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 11px; color: #555; }
         input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; transition: border 0.3s; appearance: none; }
         input:focus { border-color: var(--primary-color); outline: none; }
-        .hint { font-size: 10px; color: #888; margin-top: 2px; }
+        /* プレースホルダーの色を少し薄く */
+        input::placeholder { color: #ccc; }
         button { width: 100%; padding: 16px; background: var(--primary-color); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         button:active { transform: scale(0.98); background: #1557b0; }
         .result-box { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border-left: 5px solid var(--primary-color); }
@@ -40,35 +41,35 @@
     <div class="card">
         <h2>現在の状況</h2>
         <div class="input-row">
-            <div class="input-group"><label>現在の年齢</label><input type="number" id="currentAge" value="30"></div>
-            <div class="input-group"><label>終了年齢</label><input type="number" id="endAge" value="65"></div>
+            <div class="input-group"><label>現在の年齢</label><input type="number" id="currentAge" placeholder="30"></div>
+            <div class="input-group"><label>終了年齢</label><input type="number" id="endAge" placeholder="65"></div>
         </div>
         
         <div class="input-row">
             <div class="input-group">
-                <label>NISA現在の評価額</label><input type="number" id="startNisaValue" value="1000000">
+                <label>NISA現在の評価額</label><input type="number" id="startNisaValue" placeholder="0">
             </div>
             <div class="input-group">
-                <label>NISA評価損益</label><input type="number" id="nisaProfit" value="200000">
+                <label>NISA評価損益</label><input type="number" id="nisaProfit" placeholder="0">
             </div>
         </div>
 
         <div class="input-row">
             <div class="input-group">
-                <label>iDeCo現在の評価額</label><input type="number" id="startIdecoValue" value="500000">
+                <label>iDeCo現在の評価額</label><input type="number" id="startIdecoValue" placeholder="0">
             </div>
             <div class="input-group">
-                <label>iDeCo評価損益</label><input type="number" id="idecoProfit" value="50000">
+                <label>iDeCo評価損益</label><input type="number" id="idecoProfit" placeholder="0">
             </div>
         </div>
 
         <hr>
         <h2>これからの積立設定</h2>
         <div class="input-row">
-            <div class="input-group"><label>NISA月額</label><input type="number" id="nisaMonthly" value="50000"></div>
-            <div class="input-group"><label>iDeCo月額</label><input type="number" id="idecoMonthly" value="23000"></div>
+            <div class="input-group"><label>NISA月額</label><input type="number" id="nisaMonthly" placeholder="0"></div>
+            <div class="input-group"><label>iDeCo月額</label><input type="number" id="idecoMonthly" placeholder="0"></div>
         </div>
-        <div class="input-group"><label>期待利率 (年利%)</label><input type="number" id="rate" value="5" step="0.1"></div>
+        <div class="input-group"><label>期待利率 (年利%)</label><input type="number" id="rate" step="0.1" placeholder="5"></div>
         <button onclick="simulate()">計算 ＆ データを保存</button>
     </div>
 
@@ -82,7 +83,7 @@
 let myChart = null;
 
 window.onload = function() {
-    const saved = localStorage.getItem('invSimData_V5');
+    const saved = localStorage.getItem('invSimData_V6');
     if (saved) {
         const data = JSON.parse(saved);
         Object.keys(data).forEach(key => {
@@ -106,7 +107,8 @@ function simulate() {
         rate: parseFloat(document.getElementById('rate').value) || 0
     };
 
-    localStorage.setItem('invSimData_V5', JSON.stringify(inputs));
+    // 保存（一度入力すれば次回からはその値が入ります）
+    localStorage.setItem('invSimData_V6', JSON.stringify(inputs));
 
     const years = inputs.endAge - inputs.currentAge;
     if (years <= 0) return;
