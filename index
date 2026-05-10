@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NISA & iDeCo Sim</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+</head>
+<body>
+    <h1>投資シミュレータ</h1>
+    
+    <section>
+        <label>NISA月額: <input type="number" id="nisaAmount" value="50000"></label>
+        <label>iDeCo月額: <input type="number" id="idecoAmount" value="23000"></label>
+        <label>年利率(%): <input type="number" id="rate" value="5"></label>
+        <label>期間(年): <input type="number" id="years" value="20"></label>
+        <button onclick="simulate()">計算する</button>
+    </section>
+
+    <div id="result">
+        </div>
+
+    <script>
+        function simulate() {
+            const nAmount = parseFloat(document.getElementById('nisaAmount').value);
+            const iAmount = parseFloat(document.getElementById('idecoAmount').value);
+            const r = parseFloat(document.getElementById('rate').value) / 100 / 12;
+            const n = parseInt(document.getElementById('years').value) * 12;
+
+            const calcFV = (pmt, rate, months) => {
+                if (rate === 0) return pmt * months;
+                return pmt * ((Math.pow(1 + rate, months) - 1) / rate) * (1 + rate);
+            };
+
+            const nisaTotal = calcFV(nAmount, r, n);
+            const idecoTotal = calcFV(iAmount, r, n);
+
+            document.getElementById('result').innerHTML = `
+                <h3>結果</h3>
+                <p>NISA合計: <strong>¥${Math.round(nisaTotal).toLocaleString()}</strong></p>
+                <p>iDeCo合計: <strong>¥${Math.round(idecoTotal).toLocaleString()}</strong></p>
+                <p>総合計: <strong>¥${Math.round(nisaTotal + idecoTotal).toLocaleString()}</strong></p>
+            `;
+        }
+    </script>
+</body>
+</html>
