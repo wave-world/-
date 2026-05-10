@@ -9,7 +9,7 @@
     <link rel="apple-touch-icon" href="icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="投資シミュ">
+    <meta name="apple-mobile-web-app-title" content="資産の地図">
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -50,7 +50,6 @@
             </div>
             <div class="input-group">
                 <label>NISA評価損益</label><input type="number" id="nisaProfit" value="200000">
-                <div class="hint">※利益なら正、損失なら負</div>
             </div>
         </div>
 
@@ -66,7 +65,7 @@
         <hr>
         <h2>これからの積立設定</h2>
         <div class="input-row">
-            <div class="input-group"><label>NISA月額(最大10万)</label><input type="number" id="nisaMonthly" value="50000"></div>
+            <div class="input-group"><label>NISA月額</label><input type="number" id="nisaMonthly" value="50000"></div>
             <div class="input-group"><label>iDeCo月額</label><input type="number" id="idecoMonthly" value="23000"></div>
         </div>
         <div class="input-group"><label>期待利率 (年利%)</label><input type="number" id="rate" value="5" step="0.1"></div>
@@ -82,9 +81,8 @@
 <script>
 let myChart = null;
 
-// 起動時に LocalStorage から復元
 window.onload = function() {
-    const saved = localStorage.getItem('invSimData_V4');
+    const saved = localStorage.getItem('invSimData_V5');
     if (saved) {
         const data = JSON.parse(saved);
         Object.keys(data).forEach(key => {
@@ -103,13 +101,12 @@ function simulate() {
         nisaProfit: parseFloat(document.getElementById('nisaProfit').value) || 0,
         startIdecoValue: parseFloat(document.getElementById('startIdecoValue').value) || 0,
         idecoProfit: parseFloat(document.getElementById('idecoProfit').value) || 0,
-        nisaMonthly: Math.min(parseFloat(document.getElementById('nisaMonthly').value) || 0, 100000),
+        nisaMonthly: parseFloat(document.getElementById('nisaMonthly').value) || 0,
         idecoMonthly: parseFloat(document.getElementById('idecoMonthly').value) || 0,
         rate: parseFloat(document.getElementById('rate').value) || 0
     };
 
-    // データの永続化
-    localStorage.setItem('invSimData_V4', JSON.stringify(inputs));
+    localStorage.setItem('invSimData_V5', JSON.stringify(inputs));
 
     const years = inputs.endAge - inputs.currentAge;
     if (years <= 0) return;
@@ -117,50 +114,48 @@ function simulate() {
     const r = inputs.rate / 100 / 12;
     const NISA_LIMIT = 18000000;
 
-    // 初期元本の逆算
-    let nisaPrincipal = inputs.startNisaValue - inputs.nisaProfit;
-    let idecoPrincipal = inputs.startIdecoValue - inputs.idecoProfit;
+    let nisaPri = inputs.startNisaValue - inputs.nisaProfit;
+    let idecoPri = inputs.startIdecoValue - inputs.idecoProfit;
+    let nisaVal = inputs.startNisaValue;
+    let idecoVal = inputs.startIdecoValue;
     
-    let nisaTotal = inputs.startNisaValue;
-    let idecoTotal = inputs.startIdecoValue;
-    
-    let labels = [], assetData = [], principalData = [];
+    let labels = [], totalAsset = [], nisaPriData = [], idecoPriData = [];
     let limitYear = 0;
 
-    // 0年目のデータ
     labels.push(`${inputs.currentAge}歳`);
-    assetData.push(Math.round(nisaTotal + idecoTotal));
-    principalData.push(Math.round(nisaPrincipal + idecoPrincipal));
+    totalAsset.push(Math.round(nisaVal + idecoVal));
+    nisaPriData.push(Math.round(nisaPri));
+    idecoPriData.push(Math.round(idecoPri));
 
     for (let y = 1; y <= years; y++) {
         for (let m = 1; m <= 12; m++) {
-            // NISA枠管理
-            if (nisaPrincipal + inputs.nisaMonthly <= NISA_LIMIT) {
-                nisaTotal += inputs.nisaMonthly; nisaPrincipal += inputs.nisaMonthly;
+            if (nisaPri + inputs.nisaMonthly <= NISA_LIMIT) {
+                nisaVal += inputs.nisaMonthly; nisaPri += inputs.nisaMonthly;
             } else if (limitYear === 0) {
-                const rem = Math.max(0, NISA_LIMIT - nisaPrincipal);
-                nisaTotal += rem; nisaPrincipal += rem;
+                const rem = Math.max(0, NISA_LIMIT - nisaPri);
+                nisaVal += rem; nisaPri += rem;
                 limitYear = inputs.currentAge + y;
             }
-            nisaTotal *= (1 + r);
-            // iDeCo
-            idecoTotal += inputs.idecoMonthly; idecoPrincipal += inputs.idecoMonthly;
-            idecoTotal *= (1 + r);
+            nisaVal *= (1 + r);
+            idecoVal += inputs.idecoMonthly; idecoPri += inputs.idecoMonthly;
+            idecoVal *= (1 + r);
         }
         labels.push(`${inputs.currentAge + y}歳`);
-        assetData.push(Math.round(nisaTotal + idecoTotal));
-        principalData.push(Math.round(nisaPrincipal + idecoPrincipal));
+        totalAsset.push(Math.round(nisaVal + idecoVal));
+        nisaPriData.push(Math.round(nisaPri));
+        idecoPriData.push(Math.round(idecoPri));
     }
 
     document.getElementById('chartCard').style.display = 'block';
-    const finalAsset = nisaTotal + idecoTotal;
-    const finalPrincipal = nisaPrincipal + idecoPrincipal;
+    const finalAsset = nisaVal + idecoVal;
+    const finalPrincipal = nisaPri + idecoPri;
 
     document.getElementById('result').innerHTML = `
-        ${limitYear > 0 ? `<div class="status">⚠️${limitYear}歳でNISA生涯枠(1,800万)に到達</div>` : ""}
-        <div class="summary-item"><span>評価金額合計</span><span>¥${Math.round(finalAsset).toLocaleString()}</span></div>
-        <div class="summary-item"><span>掛金合計(元本)</span><span>¥${Math.round(finalPrincipal).toLocaleString()}</span></div>
-        <div class="summary-total"><div class="summary-item"><span>運用益</span><span>+¥${Math.round(finalAsset - finalPrincipal).toLocaleString()}</span></div></div>
+        ${limitYear > 0 ? `<div class="status">⚠️${limitYear}歳でNISA枠に到達</div>` : ""}
+        <div class="summary-item"><span>最終評価額合計</span><span>¥${Math.round(finalAsset).toLocaleString()}</span></div>
+        <div class="summary-item"><span>累計掛金(NISA)</span><span>¥${Math.round(nisaPri).toLocaleString()}</span></div>
+        <div class="summary-item"><span>累計掛金(iDeCo)</span><span>¥${Math.round(idecoPri).toLocaleString()}</span></div>
+        <div class="summary-total"><div class="summary-item"><span>合計運用益</span><span>+¥${Math.round(finalAsset - finalPrincipal).toLocaleString()}</span></div></div>
     `;
 
     const ctx = document.getElementById('myChart').getContext('2d');
@@ -169,13 +164,18 @@ function simulate() {
         data: {
             labels: labels,
             datasets: [
-                { type: 'line', label: '評価金額推移', data: assetData, borderColor: '#1a73e8', backgroundColor: 'rgba(26,115,232,0.1)', fill: false, tension: 0.3, zIndex: 2 },
-                { type: 'bar', label: '掛金累計', data: principalData, backgroundColor: 'rgba(95, 99, 104, 0.4)', borderRadius: 5, zIndex: 1 }
+                { type: 'line', label: '合計評価額', data: totalAsset, borderColor: '#1a73e8', backgroundColor: 'rgba(26,115,232,0.1)', fill: false, tension: 0.3, yAxisID: 'y' },
+                { type: 'bar', label: 'NISA掛金', data: nisaPriData, backgroundColor: '#81c995', stack: 'Stack 0' },
+                { type: 'bar', label: 'iDeCo掛金', data: idecoPriData, backgroundColor: '#fdd663', stack: 'Stack 0' }
             ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true, ticks: { callback: v => (v / 10000) + '万' } } }
+            scales: { 
+                y: { stacked: true, beginAtZero: true, ticks: { callback: v => (v / 10000) + '万' } },
+                x: { stacked: true }
+            },
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
         }
     });
     
