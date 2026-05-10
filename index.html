@@ -23,6 +23,7 @@
         label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 11px; color: #555; }
         input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; transition: border 0.3s; appearance: none; }
         input:focus { border-color: var(--primary-color); outline: none; }
+        .hint { font-size: 10px; color: #888; margin-top: 2px; }
         button { width: 100%; padding: 16px; background: var(--primary-color); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         button:active { transform: scale(0.98); background: #1557b0; }
         .result-box { margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border-left: 5px solid var(--primary-color); }
@@ -42,14 +43,28 @@
             <div class="input-group"><label>現在の年齢</label><input type="number" id="currentAge" value="30"></div>
             <div class="input-group"><label>終了年齢</label><input type="number" id="endAge" value="65"></div>
         </div>
+        
         <div class="input-row">
-            <div class="input-group"><label>NISA現在の評価額</label><input type="number" id="startNisaValue" value="1000000"></div>
-            <div class="input-group"><label>NISA使用済枠(元本)</label><input type="number" id="usedNisaLimit" value="800000"></div>
+            <div class="input-group">
+                <label>NISA現在の評価額</label><input type="number" id="startNisaValue" value="1000000">
+            </div>
+            <div class="input-group">
+                <label>NISA評価損益</label><input type="number" id="nisaProfit" value="200000">
+                <div class="hint">※利益なら正、損失なら負</div>
+            </div>
         </div>
-        <div class="input-group"><label>iDeCo現在の評価額</label><input type="number" id="startIdecoValue" value="500000"></div>
+
+        <div class="input-row">
+            <div class="input-group">
+                <label>iDeCo現在の評価額</label><input type="number" id="startIdecoValue" value="500000">
+            </div>
+            <div class="input-group">
+                <label>iDeCo評価損益</label><input type="number" id="idecoProfit" value="50000">
+            </div>
+        </div>
 
         <hr>
-        <h2>積立設定</h2>
+        <h2>これからの積立設定</h2>
         <div class="input-row">
             <div class="input-group"><label>NISA月額(最大10万)</label><input type="number" id="nisaMonthly" value="50000"></div>
             <div class="input-group"><label>iDeCo月額</label><input type="number" id="idecoMonthly" value="23000"></div>
@@ -69,7 +84,7 @@ let myChart = null;
 
 // 起動時に LocalStorage から復元
 window.onload = function() {
-    const saved = localStorage.getItem('invSimData_Master');
+    const saved = localStorage.getItem('invSimData_V4');
     if (saved) {
         const data = JSON.parse(saved);
         Object.keys(data).forEach(key => {
@@ -85,15 +100,16 @@ function simulate() {
         currentAge: parseInt(document.getElementById('currentAge').value) || 0,
         endAge: parseInt(document.getElementById('endAge').value) || 0,
         startNisaValue: parseFloat(document.getElementById('startNisaValue').value) || 0,
-        usedNisaLimit: parseFloat(document.getElementById('usedNisaLimit').value) || 0,
+        nisaProfit: parseFloat(document.getElementById('nisaProfit').value) || 0,
         startIdecoValue: parseFloat(document.getElementById('startIdecoValue').value) || 0,
+        idecoProfit: parseFloat(document.getElementById('idecoProfit').value) || 0,
         nisaMonthly: Math.min(parseFloat(document.getElementById('nisaMonthly').value) || 0, 100000),
         idecoMonthly: parseFloat(document.getElementById('idecoMonthly').value) || 0,
         rate: parseFloat(document.getElementById('rate').value) || 0
     };
 
-    document.getElementById('nisaMonthly').value = inputs.nisaMonthly;
-    localStorage.setItem('invSimData_Master', JSON.stringify(inputs));
+    // データの永続化
+    localStorage.setItem('invSimData_V4', JSON.stringify(inputs));
 
     const years = inputs.endAge - inputs.currentAge;
     if (years <= 0) return;
@@ -101,25 +117,33 @@ function simulate() {
     const r = inputs.rate / 100 / 12;
     const NISA_LIMIT = 18000000;
 
+    // 初期元本の逆算
+    let nisaPrincipal = inputs.startNisaValue - inputs.nisaProfit;
+    let idecoPrincipal = inputs.startIdecoValue - inputs.idecoProfit;
+    
+    let nisaTotal = inputs.startNisaValue;
+    let idecoTotal = inputs.startIdecoValue;
+    
     let labels = [], assetData = [], principalData = [];
-    let nisaTotal = inputs.startNisaValue, nisaPrincipal = inputs.usedNisaLimit;
-    let idecoTotal = inputs.startIdecoValue, idecoPrincipal = inputs.startIdecoValue;
     let limitYear = 0;
 
+    // 0年目のデータ
     labels.push(`${inputs.currentAge}歳`);
     assetData.push(Math.round(nisaTotal + idecoTotal));
     principalData.push(Math.round(nisaPrincipal + idecoPrincipal));
 
     for (let y = 1; y <= years; y++) {
         for (let m = 1; m <= 12; m++) {
+            // NISA枠管理
             if (nisaPrincipal + inputs.nisaMonthly <= NISA_LIMIT) {
                 nisaTotal += inputs.nisaMonthly; nisaPrincipal += inputs.nisaMonthly;
             } else if (limitYear === 0) {
-                const rem = NISA_LIMIT - nisaPrincipal;
+                const rem = Math.max(0, NISA_LIMIT - nisaPrincipal);
                 nisaTotal += rem; nisaPrincipal += rem;
                 limitYear = inputs.currentAge + y;
             }
             nisaTotal *= (1 + r);
+            // iDeCo
             idecoTotal += inputs.idecoMonthly; idecoPrincipal += inputs.idecoMonthly;
             idecoTotal *= (1 + r);
         }
@@ -145,8 +169,8 @@ function simulate() {
         data: {
             labels: labels,
             datasets: [
-                { type: 'line', label: '評価金額', data: assetData, borderColor: '#1a73e8', backgroundColor: 'rgba(26,115,232,0.1)', fill: false, tension: 0.3, zIndex: 2 },
-                { type: 'bar', label: '掛金(元本)', data: principalData, backgroundColor: 'rgba(95, 99, 104, 0.4)', borderRadius: 5, zIndex: 1 }
+                { type: 'line', label: '評価金額推移', data: assetData, borderColor: '#1a73e8', backgroundColor: 'rgba(26,115,232,0.1)', fill: false, tension: 0.3, zIndex: 2 },
+                { type: 'bar', label: '掛金累計', data: principalData, backgroundColor: 'rgba(95, 99, 104, 0.4)', borderRadius: 5, zIndex: 1 }
             ]
         },
         options: {
